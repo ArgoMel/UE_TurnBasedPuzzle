@@ -73,4 +73,5 @@ Plugins/*/Intermediate/*
 # Cache files for the editor to use
 DerivedDataCache/*
 
-Content/ParagonAssets/Environment/*
+Content/ParagonAssets/Environment/Agora/*
+Content/ParagonAssets/Environment/KiteDemo/*
