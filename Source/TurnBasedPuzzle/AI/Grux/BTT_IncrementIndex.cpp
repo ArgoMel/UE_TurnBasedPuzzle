@@ -1,8 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "BTT_IncrementIndex.h"
-
 #include "BehaviorTree/BlackboardComponent.h"
 #include "TurnBasedPuzzle/AI/EnemyController.h"
 #include "TurnBasedPuzzle/Characters/EnemyCharacter.h"

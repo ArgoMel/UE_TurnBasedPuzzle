@@ -3,6 +3,7 @@
 #include "GameFramework/Actor.h"
 #include "BasePickup.generated.h"
 
+class UBoxComponent;
 class URotatingMovementComponent;
 
 UENUM()

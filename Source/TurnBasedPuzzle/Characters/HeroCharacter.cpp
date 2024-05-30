@@ -57,6 +57,7 @@ void AHeroCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 		// handle player movement
 		EnhancedInputComponent->BindAction(ActionMove,ETriggerEvent::Started,this,&AHeroCharacter::StartClickNode);
 		EnhancedInputComponent->BindAction(ActionMove,ETriggerEvent::Completed,this,&AHeroCharacter::MovePlayerToNodeLocation);
+		EnhancedInputComponent->BindAction(ActionMove,ETriggerEvent::Canceled,this,&AHeroCharacter::MovePlayerToNodeLocation);
 
 		// handle teleport 
 		EnhancedInputComponent->BindAction(ActionTeleport,ETriggerEvent::Started,this,&AHeroCharacter::TeleportPlayer);
@@ -339,6 +340,6 @@ void AHeroCharacter::AddOffsetToPlayer(float DeltaTime)
 	}
 	const FVector OffsetLocation =
 		UKismetMathLibrary::VInterpTo(GetActorLocation(), NodeLocation, DeltaTime, MoveSpeed);
-	SetActorLocation(OffsetLocation, false, nullptr);
+	SetActorLocation(OffsetLocation);
 }
 

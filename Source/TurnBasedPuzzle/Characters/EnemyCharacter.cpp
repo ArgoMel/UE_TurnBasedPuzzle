@@ -40,7 +40,7 @@ void AEnemyCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	AttackCollider->AttachToComponent(
-		GetMesh(),FAttachmentTransformRules::SnapToTargetNotIncludingScale,SocketName);
+		GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
 }
 
 void AEnemyCharacter::Tick(float DeltaTime)
