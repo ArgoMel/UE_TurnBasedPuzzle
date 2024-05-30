@@ -1,8 +1,5 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "EnemyCharacter.h"
-
+#include "../TurnedBasedMacro.h"
 #include "HeroCharacter.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Perception/PawnSensingComponent.h"
@@ -10,14 +7,13 @@
 #include "Kismet/GameplayStatics.h"
 #include "TurnBasedPuzzle/AI/EnemyController.h"
 
-
-// Sets default values
 AEnemyCharacter::AEnemyCharacter()
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+
 	AttackCollider = CreateDefaultSubobject<UBoxComponent>(TEXT("Attack Coolider"));
 	AttackCollider->SetupAttachment(GetMesh());
+
 	PawnSensingComp = CreateDefaultSubobject<UPawnSensingComponent>(TEXT("Pawn Sensing Comp"));
 	PawnSensingComp->HearingThreshold = 1000.0f;
 	PawnSensingComp->LOSHearingThreshold = 1200.0f;
@@ -25,27 +21,36 @@ AEnemyCharacter::AEnemyCharacter()
 	PawnSensingComp->SetPeripheralVisionAngle(20.0f);
 }
 
-// Called when the game starts or when spawned
 void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	AttackCollider->OnComponentBeginOverlap.AddDynamic(this,&AEnemyCharacter::OnAttackColliderBeginOverlap);
 	PawnSensingComp->OnSeePawn.AddDynamic(this,&AEnemyCharacter::OnSeenPawn);
 	PawnSensingComp->OnHearNoise.AddDynamic(this,&AEnemyCharacter::OnHearingNoise);
-	if (AHeroCharacter* HeroCharacter = Cast<AHeroCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(),0)))
+	AHeroCharacter* HeroCharacter = 
+		Cast<AHeroCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+	if (HeroCharacter&&
+		EnemyType == EEnemyType::EET_Revenant)
 	{
-		if (EnemyType == EEnemyType::EET_Revenant)
-		{
-			// bind to the hero character movement and flip 
-			HeroCharacter->OnPlayerMoved.AddDynamic(this,&AEnemyCharacter::Flip);
-		}
+		HeroCharacter->OnPlayerMoved.AddDynamic(this, &AEnemyCharacter::Flip);
 	}
 }
 
 void AEnemyCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	AttackCollider->AttachToComponent(GetMesh(),FAttachmentTransformRules::SnapToTargetNotIncludingScale,SocketName);
+	AttackCollider->AttachToComponent(
+		GetMesh(),FAttachmentTransformRules::SnapToTargetNotIncludingScale,SocketName);
+}
+
+void AEnemyCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+}
+
+void AEnemyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
 
 void AEnemyCharacter::AttackPlayer()
@@ -80,29 +85,15 @@ void AEnemyCharacter::Flip()
 	}
 }
 
-// Called every frame
-void AEnemyCharacter::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
-
-// Called to bind functionality to input
-void AEnemyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-}
-
 void AEnemyCharacter::EnemyKilled()
 {
 	bIsAlive = false;
 	SetLifeSpan(1.0f);
-	
 }
 
-void AEnemyCharacter::OnAttackColliderBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void AEnemyCharacter::OnAttackColliderBeginOverlap(UPrimitiveComponent* OverlappedComponent, 
+	AActor* OtherActor,	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, 
+	bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (AHeroCharacter* HeroCharacter = Cast<AHeroCharacter>(OtherActor))
 	{
@@ -126,10 +117,11 @@ void AEnemyCharacter::OnSeenPawn(APawn* InPawn)
 			{
 			case EEnemyType::EET_Khiamera:
 				EnemyController->GetBlackboardComponent()->SetValueAsBool(BB_CanSeePlayer,true);
-				EnemyController->GetBlackboardComponent()->SetValueAsVector(BB_PlayerLocation,HeroCharacter->GetActorLocation());
+				EnemyController->GetBlackboardComponent()->SetValueAsVector(
+					BB_PlayerLocation,HeroCharacter->GetActorLocation());
 				break;
-			case EEnemyType::EET_Revenant://
-				if (HeroCharacter->bIsAlive)//
+			case EEnemyType::EET_Revenant:
+				if (HeroCharacter->bIsAlive)
 				{
 					bCanShoot = true;
 					HeroCharacter->PlayerKilled();
@@ -141,14 +133,17 @@ void AEnemyCharacter::OnSeenPawn(APawn* InPawn)
 					{
 						UGameplayStatics::PlaySound2D(GetWorld(),Cue_PistolShoot);
 					}
-				}
-				
+				}		
 				break;
 			case EEnemyType::EET_Grux:
-				EnemyController->GetBlackboardComponent()->SetValueAsBool(BB_GruxCanSeePlayer,true);
-				EnemyController->GetBlackboardComponent()->SetValueAsVector(BB_GPlayerLocation,HeroCharacter->GetActorLocation());
-				EnemyController->GetBlackboardComponent()->SetValueAsBool(BB_GruxCanMove,false);
-				EnemyController->GetBlackboardComponent()->SetValueAsBool(BB_GruxHearNoise,false);
+				EnemyController->GetBlackboardComponent()->SetValueAsBool(
+					BB_GruxCanSeePlayer,true);
+				EnemyController->GetBlackboardComponent()->SetValueAsVector(
+					BB_GPlayerLocation,HeroCharacter->GetActorLocation());
+				EnemyController->GetBlackboardComponent()->SetValueAsBool(
+					BB_GruxCanMove,false);
+				EnemyController->GetBlackboardComponent()->SetValueAsBool(
+					BB_GruxHearNoise,false);
 				break;
 			default: ;
 			}
@@ -157,14 +152,17 @@ void AEnemyCharacter::OnSeenPawn(APawn* InPawn)
 	}
 }
 
-void AEnemyCharacter::OnHearingNoise(APawn* _Instigator, const FVector& Location, float Volume)
+void AEnemyCharacter::OnHearingNoise(APawn* _Instigator, const FVector& Location, 
+	float Volume)
 {
 	if (EnemyType == EEnemyType::EET_Grux)
 	{
 		if (AEnemyController* EnemyController = Cast<AEnemyController>(GetController()))
 		{
-			EnemyController->GetBlackboardComponent()->SetValueAsBool(BB_GruxHearNoise,true);
-			EnemyController->GetBlackboardComponent()->SetValueAsVector(BB_NoiseLocation,Location);
+			EnemyController->GetBlackboardComponent()->SetValueAsBool(
+				BB_GruxHearNoise,true);
+			EnemyController->GetBlackboardComponent()->SetValueAsVector(
+				BB_NoiseLocation,Location);
 		}
 	}
 }

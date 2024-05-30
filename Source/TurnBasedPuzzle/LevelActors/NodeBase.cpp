@@ -1,6 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "NodeBase.h"
 #include "Components/BoxComponent.h"
 #include "NiagaraComponent.h"
@@ -9,11 +6,10 @@
 #include "TurnBasedPuzzle/Characters/HeroCharacter.h"
 #include "TurnBasedPuzzle/Misc/TurnBasedMode.h"
 
-// Sets default values
 ANodeBase::ANodeBase()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
+
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	BoxCollider = CreateDefaultSubobject<UBoxComponent>(TEXT("Box Collider"));
 	NodeCollider = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Node Collider"));
@@ -49,11 +45,10 @@ ANodeBase::ANodeBase()
 	DecoFinishMesh->SetVisibility(false);
 }
 
-// Called when the game starts or when spawned
 void ANodeBase::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	BoxCollider->OnComponentBeginOverlap.AddDynamic(this, &ANodeBase::OnBoxColliderBeginOverlap);
 }
 
 void ANodeBase::OnConstruction(const FTransform& Transform)
@@ -67,30 +62,27 @@ void ANodeBase::OnConstruction(const FTransform& Transform)
 	FX_Teleport->SetVisibility(bShowFX_Teleport);
 }
 
-// Called every frame
 void ANodeBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	BoxCollider->OnComponentBeginOverlap.AddDynamic(this,&ANodeBase::OnBoxColliderBeginOverlap);
 }
 
-void ANodeBase::OnBoxColliderBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void ANodeBase::OnBoxColliderBeginOverlap(UPrimitiveComponent* OverlappedComponent, 
+	AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, 
+	bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (AHeroCharacter* HeroCharacter = Cast<AHeroCharacter>(OtherActor))
 	{
 		HeroCharacter->bIsMoving = false;
-		if (bIsEndNode)
+		if (bIsEndNode&&
+			VictoryWidget)
 		{
-			if (VictoryWidget)
+			CreateWidget<UUserWidget>(GetWorld(), VictoryWidget)->AddToViewport(0);
+			if (ATurnBasedMode* TurnBasedMode = 
+				Cast<ATurnBasedMode>(UGameplayStatics::GetGameMode(GetWorld())))
 			{
-				CreateWidget<UUserWidget>(GetWorld(),VictoryWidget)->AddToViewport(0);
-				if (ATurnBasedMode* TurnBasedMode = Cast<ATurnBasedMode>(UGameplayStatics::GetGameMode(GetWorld())))
-				{
-					TurnBasedMode->SetNextLevel(LevelName);
-				}
+				TurnBasedMode->SetNextLevel(LevelName);
 			}
-			
 		}
 	}
 }

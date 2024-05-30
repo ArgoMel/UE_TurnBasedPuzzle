@@ -1,6 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "HeroCharacter.h"
 #include "EnemyCharacter.h"
 #include "TurnBasedPuzzle/LevelActors/ThrowableStone.h"
@@ -17,41 +14,38 @@
 #include "TurnBasedPuzzle/LevelActors/BasePickup.h"
 #include "TurnBasedPuzzle/LevelActors/NodeBase.h"
 
-// Sets default values
 AHeroCharacter::AHeroCharacter()
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-	PawnNoiseEmitterComp = CreateDefaultSubobject<UPawnNoiseEmitterComponent>(TEXT("Pawn Noise Emitter Comp"));
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationRoll = false;
+	bUseControllerRotationYaw = false;
+
 	GetCharacterMovement()->bOrientRotationToMovement = true;
+
+	PawnNoiseEmitterComp = CreateDefaultSubobject<UPawnNoiseEmitterComponent>(TEXT("Pawn Noise Emitter Comp"));
 }
 
-// Called when the game starts or when spawned
 void AHeroCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	bUseControllerRotationPitch = false;//
-	bUseControllerRotationRoll = false;//
-	bUseControllerRotationYaw = false;//
 	InsertMappingContext();
-	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance &&
+		Montage_Intro)
 	{
-		if (Montage_Intro)
-		{
-			AnimInstance->Montage_Play(Montage_Intro,1.0f);
-			GetWorldTimerManager().SetTimer(TH_ResetPlayerMovment,this,&AHeroCharacter::ResetPlayerMovment,1.0f,false,1.5f);
-		}
+		AnimInstance->Montage_Play(Montage_Intro, 1.0f);
+		GetWorldTimerManager().SetTimer(TH_ResetPlayerMovment, 
+			this, &AHeroCharacter::ResetPlayerMovment, 1.0f, false, 1.5f);
 	}
 }
 
-// Called every frame
 void AHeroCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	AddOffsetToPlayer(DeltaTime);
 }
 
-// Called to bind functionality to input
 void AHeroCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -74,27 +68,28 @@ void AHeroCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 void AHeroCharacter::SpawnStone()
 {
-	if (StoneClass)
+	if (!StoneClass)
 	{
-		const FVector SpawnLocation = GetActorLocation();
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.Instigator = this;
-		SpawnParams.Owner = this;
-		StoneInstance = GetWorld()->SpawnActor<AThrowableStone>(StoneClass,SpawnLocation,FRotator::ZeroRotator,SpawnParams);
-		const FName StoneSocket = FName("StoneSocket");
-		StoneInstance->AttachToComponent(GetMesh(),FAttachmentTransformRules::SnapToTargetNotIncludingScale,StoneSocket);
-		StoneInstance->SetActorScale3D(FVector(.7f));
+		return;
 	}
+	const FVector SpawnLocation = GetActorLocation();
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Instigator = this;
+	SpawnParams.Owner = this;
+	StoneInstance = GetWorld()->SpawnActor<AThrowableStone>(
+		StoneClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
+	const FName StoneSocket = FName("StoneSocket");
+	StoneInstance->AttachToComponent(GetMesh(), 
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale, StoneSocket);
+	StoneInstance->SetActorScale3D(FVector(.7f));
 }
 
 void AHeroCharacter::ReportNoise()
 {
-	if (PawnNoiseEmitterComp)
+	if (PawnNoiseEmitterComp&& 
+		TargetNode)
 	{
-		if (TargetNode)
-		{
-			PawnNoiseEmitterComp->MakeNoise(TargetNode,1000.0f,StoneLocation);
-		}
+		PawnNoiseEmitterComp->MakeNoise(TargetNode, 1000.0f, StoneLocation);
 	}
 }
 
@@ -115,41 +110,47 @@ void AHeroCharacter::PlayerKilled()
 
 void AHeroCharacter::PistolShoot()
 {
-	if (CanPlayerShoot())
+	if (!CanPlayerShoot())
 	{
-		bCanClickNode = false;
-		if (const AHeroController* HeroController = Cast<AHeroController>(GetController()))
+		return;
+	}
+	bCanClickNode = false;
+	const AHeroController* HeroController = Cast<AHeroController>(GetController());
+	if (!HeroController)
+	{
+		return;
+	}
+	FHitResult HitResult;
+	if (!HeroController->GetHitResultUnderCursorForObjects(ShootObjectsQuery, true, HitResult))
+	{
+		return;
+	}
+	AEnemyCharacter* EnemyCharacter = Cast<AEnemyCharacter>(HitResult.GetActor());
+	if (!EnemyCharacter)
+	{
+		return;
+	}
+	--PistolAmmo;
+	EnemyCharacter->EnemyKilled();
+	const FRotator YawRotation = UKismetMathLibrary::FindLookAtRotation(
+		GetActorLocation(), EnemyCharacter->GetActorLocation());
+	SetActorRotation(FRotator(0.0f, YawRotation.Yaw, 0.0f));
+	if (Cue_PistolShoot)
+	{
+		UGameplayStatics::PlaySound2D(GetWorld(), Cue_PistolShoot);
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance &&
+			Montage_Fire)
 		{
-			FHitResult HitResult;
-			if (HeroController->GetHitResultUnderCursorForObjects(ShootObjectsQuery,true,HitResult))
+			AnimInstance->Montage_Play(Montage_Fire, 1.0f);
+			if (FX_Pistol)
 			{
-				if (AEnemyCharacter* EnemyCharacter = Cast<AEnemyCharacter>(HitResult.GetActor()))
-				{
-					--PistolAmmo;
-					EnemyCharacter->EnemyKilled();
-					const FRotator YawRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(),EnemyCharacter->GetActorLocation());
-					SetActorRotation(FRotator(0.0f,YawRotation.Yaw,0.0f));
-					if (Cue_PistolShoot)
-					{
-						UGameplayStatics::PlaySound2D(GetWorld(),Cue_PistolShoot);
-						if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
-						{
-							if (Montage_Fire != nullptr)
-							{
-								AnimInstance->Montage_Play(Montage_Fire,1.0f);
-								if (FX_Pistol)
-								{
-									const FName SpawnSocket = FName("Muzzle_01");
-									const FVector SpawnLocation = GetMesh()->GetSocketLocation(SpawnSocket);
-									UGameplayStatics::SpawnEmitterAtLocation(GetWorld(),FX_Pistol,SpawnLocation,FRotator::ZeroRotator);
-									GetWorldTimerManager().SetTimer(TH_ResetPlayerMovment,this,&AHeroCharacter::ResetPlayerMovment,1.0f,false,2.0f);
-								}
-							}
-						}
-					}
-				}
-				
-				
+				const FName SpawnSocket = FName("Muzzle_01");
+				const FVector SpawnLocation = GetMesh()->GetSocketLocation(SpawnSocket);
+				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), 
+					FX_Pistol, SpawnLocation, FRotator::ZeroRotator);
+				GetWorldTimerManager().SetTimer(TH_ResetPlayerMovment, 
+					this, &AHeroCharacter::ResetPlayerMovment, 1.0f, false, 2.0f);
 			}
 		}
 	}
@@ -157,75 +158,77 @@ void AHeroCharacter::PistolShoot()
 
 void AHeroCharacter::ThrowStone()
 {
-	if (bCanThrowStone)
+	if (!bCanThrowStone)
 	{
-		bCanThrowStone = false;
-		bCanClickNode = false;
-		if (const AHeroController* HeroController = Cast<AHeroController>(GetController()))
+		return;
+	}
+	bCanThrowStone = false;
+	bCanClickNode = false;
+	const AHeroController* HeroController = Cast<AHeroController>(GetController());
+	if (!HeroController)
+	{
+		return;
+	}
+	FHitResult HitResult;
+	if (!HeroController->GetHitResultUnderCursorForObjects(StoneObjectsQuery, true, HitResult))
+	{
+		return;
+	}
+	if (ANodeBase* NodeBase = Cast<ANodeBase>(HitResult.GetActor()))
+	{
+		TargetNode = NodeBase;
+		StoneLocation = HitResult.Location;
+		const FRotator YawRotation = 
+			UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), StoneLocation);
+		SetActorRotation(FRotator(0.0f, YawRotation.Yaw, 0.0f));
+		if (TargetNode&&
+			!TargetNode->BoxCollider->IsOverlappingActor(this)&&
+			StoneInstance)
 		{
-			FHitResult HitResult;
-			if (HeroController->GetHitResultUnderCursorForObjects(StoneObjectsQuery,true,HitResult))
-			{
-				if (ANodeBase* NodeBase = Cast<ANodeBase>(HitResult.GetActor()))
-				{
-					TargetNode = NodeBase;
-					StoneLocation = HitResult.Location;
-					const FRotator YawRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(),StoneLocation);
-					SetActorRotation(FRotator(0.0f,YawRotation.Yaw,0.0f));
-
-					if (TargetNode)
-					{
-						if (!TargetNode->BoxCollider->IsOverlappingActor(this))
-						{
-							if (StoneInstance)
-							{
-								StoneInstance->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-								const FVector VecDistance = NodeLocation - GetActorLocation();
-								const FVector Velocity = UKismetMathLibrary::MakeVector(VecDistance.X,VecDistance.Y,VecDistance.Z + 600.0f); //
-								StoneInstance->ThrowStone(TargetNode,Velocity);
-							}
-						}
-					}
-				}
-			}
+			StoneInstance->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+			const FVector VecDistance = NodeLocation - GetActorLocation();
+			const FVector Velocity = 
+				FVector(VecDistance.X, VecDistance.Y, VecDistance.Z + 600.0f);
+			StoneInstance->ThrowStone(TargetNode, Velocity);
 		}
 	}
 }
 
 void AHeroCharacter::TeleportPlayer()
 {
-	if (bCanTeleport)
+	if (!bCanTeleport)
 	{
-		TArray<AActor*> OverlapActors;
-		GetCapsuleComponent()->GetOverlappingActors(OverlapActors,ANodeBase::StaticClass());
-		if (const ANodeBase* NodeBase = Cast<ANodeBase>(OverlapActors[0]))
+		return;
+	}
+	TArray<AActor*> OverlapActors;
+	GetCapsuleComponent()->GetOverlappingActors(OverlapActors, ANodeBase::StaticClass());
+	const ANodeBase* NodeBase = Cast<ANodeBase>(OverlapActors[0]);
+	if (NodeBase&&
+		NodeBase->TeleportNode)
+	{
+		if (Cue_Teleport)
 		{
-			if (NodeBase->TeleportNode != nullptr)
+			UGameplayStatics::PlaySound2D(GetWorld(), Cue_Teleport);
+		}
+		if (FX_Teleport)
+		{
+			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), 
+				FX_Teleport, NodeBase->TeleportNode->GetActorLocation());
+			const FRotator YawRotation = UKismetMathLibrary::FindLookAtRotation(
+				NodeBase->GetActorLocation(), GetActorLocation());
+			const FVector TeleportLocation = NodeBase->TeleportNode->GetActorLocation();
+			TArray<AActor*> OverlapPickups;
+			UGameplayStatics::GetAllActorsOfClass(
+				GetWorld(), ABasePickup::StaticClass(), OverlapPickups);
+			if (const ABasePickup* BasePickup = Cast<ABasePickup>(OverlapPickups[0]))
 			{
-				if (Cue_Teleport)
+				if (NodeBase->TeleportNode->BoxCollider->IsOverlappingActor(BasePickup))
 				{
-					UGameplayStatics::PlaySound2D(GetWorld(),Cue_Teleport);
-					if (FX_Teleport)
-					{
-						UGameplayStatics::SpawnEmitterAtLocation(GetWorld(),FX_Teleport,NodeBase->TeleportNode->GetActorLocation());
-						const FRotator YawRotation = UKismetMathLibrary::FindLookAtRotation(NodeBase->GetActorLocation(),GetActorLocation());
-						const FVector TeleportLocation = NodeBase->TeleportNode->GetActorLocation();
-						TArray<AActor*> OverlapPickups;
-						UGameplayStatics::GetAllActorsOfClass(GetWorld(),ABasePickup::StaticClass(),OverlapPickups);
-						if (const ABasePickup* BasePickup = Cast<ABasePickup>(OverlapPickups[0]))
-						{
-							if (NodeBase->TeleportNode->BoxCollider->IsOverlappingActor(BasePickup))
-							{
-								TeleportTo(TeleportLocation,FRotator(0.0f,YawRotation.Yaw,0.0f));
-							}
-							else
-							{
-								TeleportTo(TeleportLocation,FRotator(0.0f,YawRotation.Yaw,0.0f));
-							}
-						}
-						
-						
-					}
+					TeleportTo(TeleportLocation, FRotator(0.0f, YawRotation.Yaw, 0.0f));
+				}
+				else
+				{
+					TeleportTo(TeleportLocation, FRotator(0.0f, YawRotation.Yaw, 0.0f));
 				}
 			}
 		}
@@ -234,55 +237,59 @@ void AHeroCharacter::TeleportPlayer()
 
 void AHeroCharacter::StartClickNode()
 {
-	if (bCanClickNode)
+	if (!bCanClickNode)
 	{
-		if (const AHeroController* HeroController = Cast<AHeroController>(GetController()))
+		return;
+	}
+	const AHeroController* HeroController = Cast<AHeroController>(GetController());
+	if (!HeroController)
+	{
+		return;
+	}
+	FHitResult HitResult;
+	if (!HeroController->GetHitResultUnderCursorForObjects(ClickObjectsQuery, true, HitResult))
+	{
+		return;
+	}
+	const ANodeBase* NodeBase = Cast<ANodeBase>(HitResult.GetActor());
+	if (!NodeBase)
+	{
+		return;
+	}
+	if (GetCapsuleComponent()->IsOverlappingActor(NodeBase))
+	{
+		return;
+	}
+	const float Distance = FVector::Distance(GetActorLocation(), HitResult.Location);
+	if (Distance <= AcceptDistance)
+	{
+		TArray<AActor*> OverlapActors;
+		NodeBase->BoxCollider->GetOverlappingActors(
+			OverlapActors, AEnemyCharacter::StaticClass());
+		if (!OverlapActors.IsEmpty())
 		{
-			FHitResult HitResult;
-			
-			if (HeroController->GetHitResultUnderCursorForObjects(ClickObjectsQuery,true,HitResult))
+			if (const AEnemyCharacter* EnemyCharacter = Cast<AEnemyCharacter>(OverlapActors[0]))
 			{
-				if (const ANodeBase* NodeBase = Cast<ANodeBase>(HitResult.GetActor()))
+				if (!NodeBase->BoxCollider->IsOverlappingActor(EnemyCharacter))
 				{
-					if (!GetCapsuleComponent()->IsOverlappingActor(NodeBase))
+					NodeLocation = HitResult.Location;
+					bIsMoving = true;
+					bCanTeleport = NodeBase->bIsTeleport;
+					if (OnPlayerMoved.IsBound())
 					{
-						const float Distance = FVector::Distance(GetActorLocation(),HitResult.Location);
-						if (Distance <= AcceptDistance)
-						{
-							TArray<AActor*> OverlapActors;
-							NodeBase->BoxCollider->GetOverlappingActors(OverlapActors,AEnemyCharacter::StaticClass());
-							if (!OverlapActors.IsEmpty())
-							{
-								if (const AEnemyCharacter* EnemyCharacter = Cast<AEnemyCharacter>(OverlapActors[0]))
-								{
-									if (!NodeBase->BoxCollider->IsOverlappingActor(EnemyCharacter))
-									{
-										NodeLocation = HitResult.Location;
-										bIsMoving = true;
-										//bCanClickNode = false;
-										bCanTeleport = NodeBase->bIsTeleport;
-										if (OnPlayerMoved.IsBound())
-										{
-											OnPlayerMoved.Broadcast();
-										}
-									}
-								}
-							}
-							else
-							{
-								NodeLocation = HitResult.Location;
-								bIsMoving = true;
-								//bCanClickNode = false;
-								bCanTeleport = NodeBase->bIsTeleport;
-								if (OnPlayerMoved.IsBound())
-								{
-									OnPlayerMoved.Broadcast();
-								}
-							}
-							
-						}
+						OnPlayerMoved.Broadcast();
 					}
 				}
+			}
+		}
+		else
+		{
+			NodeLocation = HitResult.Location;
+			bIsMoving = true;
+			bCanTeleport = NodeBase->bIsTeleport;
+			if (OnPlayerMoved.IsBound())
+			{
+				OnPlayerMoved.Broadcast();
 			}
 		}
 	}
@@ -290,12 +297,13 @@ void AHeroCharacter::StartClickNode()
 
 void AHeroCharacter::MovePlayerToNodeLocation()
 {
-	if (bIsMoving)
+	if (!bIsMoving)
 	{
-		if (AHeroController* HeroController = Cast<AHeroController>(GetController()))
-		{
-			UAIBlueprintHelperLibrary::SimpleMoveToLocation(HeroController,NodeLocation);
-		}
+		return;
+	}
+	if (AHeroController* HeroController = Cast<AHeroController>(GetController()))
+	{
+		UAIBlueprintHelperLibrary::SimpleMoveToLocation(HeroController, NodeLocation);
 	}
 }
 
@@ -303,13 +311,12 @@ void AHeroCharacter::InsertMappingContext()
 {
 	if (const AHeroController* HeroController = Cast<AHeroController>(GetController()))
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* EnhancedInputSubsystem =
-			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(HeroController->GetLocalPlayer()))
+		UEnhancedInputLocalPlayerSubsystem* EnhancedInputSubsystem =
+			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(HeroController->GetLocalPlayer());
+		if (EnhancedInputSubsystem&&
+			HeroMappingContext)
 		{
-			if (HeroMappingContext)
-			{
-				EnhancedInputSubsystem->AddMappingContext(HeroMappingContext,0);
-			}
+			EnhancedInputSubsystem->AddMappingContext(HeroMappingContext, 0);
 		}
 	}
 }
@@ -326,11 +333,12 @@ void AHeroCharacter::ResetPlayerMovment()
 
 void AHeroCharacter::AddOffsetToPlayer(float DeltaTime)
 {
-	if (bIsMoving)
+	if (!bIsMoving)
 	{
-		const FVector OffsetLocation = UKismetMathLibrary::VInterpTo(GetActorLocation(),NodeLocation,DeltaTime,MoveSpeed);
-		SetActorLocation(OffsetLocation,false,nullptr);
-		
+		return;
 	}
+	const FVector OffsetLocation =
+		UKismetMathLibrary::VInterpTo(GetActorLocation(), NodeLocation, DeltaTime, MoveSpeed);
+	SetActorLocation(OffsetLocation, false, nullptr);
 }
 

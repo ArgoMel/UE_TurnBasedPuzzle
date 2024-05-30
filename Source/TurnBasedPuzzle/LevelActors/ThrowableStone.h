@@ -1,44 +1,40 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ThrowableStone.generated.h"
 
+class USphereComponent;
+class UProjectileMovementComponent;
+
 UCLASS()
 class TURNBASEDPUZZLE_API AThrowableStone : public AActor
 {
 	GENERATED_BODY()
-	
 public:	
-	// Sets default values for this actor's properties
 	AThrowableStone();
+protected:
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
 
+public:
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Throwable Stone")
-	UStaticMeshComponent* StoneMesh;
-
+	TObjectPtr<UStaticMeshComponent> StoneMesh;
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Throwable Stone")
-	class USphereComponent* SphereCollider;
-
+	TObjectPtr<USphereComponent> SphereCollider;
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Throwable Stone")
-	class UProjectileMovementComponent* ProjectileMovementComp;
+	TObjectPtr<UProjectileMovementComponent> ProjectileMovementComp;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Throwable Stone")
-	USoundBase* Cue_Impact;
+	TObjectPtr<USoundBase> Cue_Impact;
 	
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-	
+public:
 	UFUNCTION(BlueprintCallable,Category="Throwable")
 	void ThrowStone(AActor* Actor , FVector InVelocity);
 
 	UFUNCTION()
-	void OnSphereColliderBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult);
+	void OnSphereColliderBeginOverlap(UPrimitiveComponent* OverlappedComponent, 
+		AActor* OtherActor,	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, 
+		bool bFromSweep, const FHitResult & SweepResult);
 	
 };

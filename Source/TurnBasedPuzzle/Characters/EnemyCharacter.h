@@ -62,16 +62,6 @@ public:
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Enemy|Grux")// for Grux
 	TObjectPtr<APatrolPath> PatrolPath;
-	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Enemy|Grux") // for Grux
-	FName BB_GruxCanSeePlayer = TEXT("GruxCanSeePlayer");
-	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Enemy|Grux") // for Grux
-	FName BB_GPlayerLocation = TEXT("GPlayerLocation");	
-	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Enemy|Grux")// for Grux
-	FName BB_GruxCanMove = TEXT("GruxCanMove");
-	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Enemy|Grux")// for Grux
-	FName BB_GruxHearNoise = TEXT("GruxHearNoise");
-	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Enemy|Grux")// for Grux
-	FName  BB_NoiseLocation = TEXT("NoiseLocation");
 	
 public:
 	UFUNCTION(BlueprintCallable,Category="Enemy")
